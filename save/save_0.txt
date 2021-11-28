@@ -1,0 +1,272 @@
+#include <iostream>
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_font.h>
+#include <allegro5/allegro_ttf.h>
+#include <allegro5/allegro_image.h>
+#include "keyboard.hpp"
+#include "window.hpp"
+#include "bird.hpp"
+#include "mouse.h"
+
+#define GAME_TERMINATE 666
+#define KEEP_RUNNING 668
+
+using namespace std;
+
+
+keyboard *KB;
+window *WD;
+bird *yellow_bird;
+
+void show_err_msg(int msg);
+void game_init();
+void game_begin();
+int process_event();
+int game_run();
+void game_destroy();
+
+
+int main(int argc, char *argv[]) {
+    int msg = 0;
+
+    game_init();
+    printf("Hello world!!!\n");
+
+    while (msg != GAME_TERMINATE) {
+        msg = game_run();
+        if (msg == GAME_TERMINATE)
+            printf("See you, world\n");
+    }
+
+    game_destroy();
+    return 0;
+}
+
+
+void show_err_msg(int msg) {
+    fprintf(stderr, "unexpected msg: %d", msg);
+    game_destroy();
+    exit(9);
+}
+
+void game_init() {
+    if (!al_init()) {
+        show_err_msg(-1);
+    }
+
+    KB = new keyboard;
+    WD = new window;
+    yellow_bird = new bird;
+
+}
+
+
+int process_event() {
+    ALLEGRO_EVENT key_event = KB->latest_event();
+
+    yellow_bird->calculate(key_event);
+    yellow_bird->draw();
+
+    return 0;
+}
+
+int game_run() {
+    if (!KB->queue_empty()) {
+        return process_event();
+    }
+    else if(!WD->queue_empty()) {
+        return WD->judge_terminate();
+    }
+    else{
+        return KEEP_RUNNING;
+    }
+}
+
+void game_destroy() {
+    delete KB;
+    delete WD;
+    delete yellow_bird;
+}
+
+#include "bird.hpp"
+using namespace std;
+
+#define up 0
+#define down 1
+#define left 2
+#define right 3
+
+bird::bird()
+{
+    pos_x = 160;
+    pos_y = 240;
+    key = new bool [4];
+
+    img = nullptr;
+    img = al_load_bitmap("bird.jpg");
+    if(!img) cout << "bird err" << endl;
+}
+
+bird::~bird()
+{
+    al_destroy_bitmap(img);
+    delete [] key;
+}
+
+void bird::calculate(ALLEGRO_EVENT event)
+{
+/*
+    if(key_event.type == ALLEGRO_EVENT_KEY_DOWN){
+        cout << "dick" << endl;
+    }
+*/
+    if(event.type == ALLEGRO_EVENT_KEY_DOWN){
+        switch(event.keyboard.keycode){
+            case ALLEGRO_KEY_UP :
+                key[up] = true;
+                break;
+            case ALLEGRO_KEY_DOWN :
+                key[down] = true;
+                break;
+            case ALLEGRO_KEY_LEFT :
+                key[left] = true;
+                break;
+            case ALLEGRO_KEY_RIGHT :
+                key[right] = true;
+                break;
+        }
+    }
+    else if(event.type == ALLEGRO_EVENT_KEY_UP){
+        switch(event.keyboard.keycode){
+            case ALLEGRO_KEY_UP :
+                key[up] = false;
+                break;
+            case ALLEGRO_KEY_DOWN :
+                key[down] = false;
+                break;
+            case ALLEGRO_KEY_LEFT :
+                key[left] = false;
+                break;
+            case ALLEGRO_KEY_RIGHT :
+                key[right] = false;
+                break;
+        }
+    }
+
+    pos_x = ( pos_x + (int)key[right] * 10 ) % 800;
+    pos_x = ( pos_x - (int)key[left] * 10 ) % 800;
+    pos_y = ( pos_y - (int)key[up] * 10 ) % 600;
+    pos_y = ( pos_y + (int)key[down] * 10 ) % 600;
+    std::cout << key[up] << ' ' << key[down] << ' ' << key[left] << ' ' << key[right] << std::endl;
+    std::cout << pos_x << ' ' << pos_y << std::endl;
+}
+
+void bird::draw()
+{
+    al_clear_to_color(al_map_rgb(20,0,0));
+    al_draw_bitmap(img, pos_x, pos_y, 0);
+    al_flip_display();
+}
+
+#include "window.hpp"
+
+#define GAME_TERMINATE 666
+#define KEEP_RUNNING 668
+
+window::window()
+{
+    display = nullptr;
+    event_queue = nullptr;
+    display = al_create_display(width, height);
+    event_queue = al_create_event_queue();
+    al_init_font_addon();
+
+    if(!al_init_primitives_addon()) std::cout << "init primitive err" << std::endl;\
+    if(!al_init_image_addon()) std::cout << "init image err" << std::endl;
+    if(!al_init_ttf_addon()) std::cout << "init ttf err" << std::endl;
+    if(!display || !event_queue) std::cout << "init window err" << std::endl;
+
+    al_register_event_source(event_queue, al_get_display_event_source(display));
+    al_clear_to_color(al_map_rgb(20, 20, 60));
+    al_flip_display();
+}
+
+window::~window()
+{
+    cout << "dick";
+    al_destroy_display(display);
+}
+
+bool window::queue_empty()
+{
+    return al_is_event_queue_empty(event_queue);
+}
+
+int window::judge_terminate()
+{
+    al_wait_for_event(event_queue, &event);
+
+    if(event.type == ALLEGRO_EVENT_DISPLAY_CLOSE){
+        return GAME_TERMINATE;
+    }
+    else{
+        return KEEP_RUNNING;
+    }
+}
+
+
+
+#include <iostream>
+#include <allegro5/allegro.h>
+#include <allegro5/allegro_primitives.h>
+#include <allegro5/allegro_font.h>
+#include <allegro5/allegro_ttf.h>
+#include <allegro5/allegro_image.h>
+#include "keyboard.hpp"
+
+#define up 0
+#define down 1
+#define left 2
+#define right 3
+
+using namespace std;
+
+
+keyboard::keyboard()
+{
+    event_queue = nullptr;
+    event_queue = al_create_event_queue();
+
+    if (!event_queue) {
+        cout << "load keyboard event Q err" << endl;
+    }
+
+    if(!al_install_keyboard()) cout << "keyboard err";
+
+    al_register_event_source(event_queue, al_get_keyboard_event_source() );
+
+}
+
+ALLEGRO_EVENT keyboard::latest_event()
+{
+    al_wait_for_event(event_queue, &event);
+
+    return event;
+}
+
+bool keyboard::queue_empty()
+{
+    return al_is_event_queue_empty(event_queue);
+}
+
+void keyboard::clear()
+{
+    al_flush_event_queue(event_queue);
+}
+
+keyboard::~keyboard()
+{
+    al_destroy_event_queue(event_queue);
+}
+
